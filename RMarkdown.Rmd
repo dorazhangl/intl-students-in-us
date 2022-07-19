@@ -1,0 +1,383 @@
+---
+title: "The Decline of International Students in the U.S."
+author: "Dora Zhang"
+date: "4/29/2022"
+output:
+  html_document:
+    fig_width: 9
+    fig_height: 6
+    code_folding: hide
+---
+<style type="text/css">
+  body{
+  font-size:12pt;
+  }
+</style>
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE,message = FALSE)
+```
+
+
+The number of international students enrolled in U.S. colleges and universities increased more than 70% between 2005 and 2016.Their enrollment reached 4.5% of the U.S. higher education total in 2016 and 2017.However, the number has been on a downward trend after 2016.
+
+
+```{r historic}
+library(readxl)
+library(tidyverse)
+library(rvest)
+library(scales)
+library("ggrepel")
+library(plotly)
+library(gt)
+
+#historic total enrollment data from IIE Open Doors Report
+hist <- read_excel("historic.xlsx", range = "A1:F74")
+names(hist)<-c('year','enrolled','opt','intl_total','change_pct','us')
+hist$year<-c(seq(1948,2020,1))
+hist$enrolled<-as.numeric(hist$enrolled)
+hist$opt<-as.numeric(hist$opt)
+hist$change_pct<-as.numeric(hist$change_pct)
+hist$us<-as.numeric(hist$us)
+hist$enrolled[1:31]<-hist$intl_total[1:31]
+
+p.hist<-hist%>%mutate(intl.rt=enrolled/us)%>%
+    filter(year>1989)%>%
+    ggplot(aes(x=year,y=enrolled,group = 1,text=paste("Year:",year,
+                                                      "<br>Intl Enrollment:",enrolled,
+                                                      "<br>",percent(intl.rt,.1),"of Total in U.S.")),fill='steelblue')+
+    geom_area(fill='steelblue')+
+    geom_line(color="darkgray")+
+    theme(plot.background = element_rect(colour = "lightgray"),
+          panel.background = element_rect(fill = "white"),
+          axis.title.y=element_blank(),
+          axis.title.x=element_blank(),
+          panel.grid.major.y = element_line(size=.1, color="gray"),
+          axis.ticks.y=element_blank())+
+    scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3),
+                       limits=c(0,1100000),
+                       expand=c(0,0))+
+    scale_x_continuous(breaks=seq(1990,2020,5),
+                       expand=c(0.02,0))+
+    annotate("text",x=2019,y=970000,label="COVID-19",col="darkgray")+
+    annotate("segment",x=2020,xend=2020,y=950000, yend = 0,col="darkgray",arrow=arrow(),linetype="dashed")+
+    annotate("text",x=2014,y=980000,label="2014 Oil Price Drop",col="darkgray")+
+    annotate("segment",x=2014,xend=2014,y=960000, yend = 0,col="darkgray",arrow=arrow(),linetype="dashed")+
+    annotate("text",x=2008,y=800000,label="2008 Financial Crisis",col="darkgray")+
+    annotate("segment",x=2008,xend=2008,y=780000, yend = 0,col="darkgray",arrow=arrow(),linetype="dashed")+
+    annotate("text",x=2001,y=700000,label="2001 9/11 Terrorist Attack",col="darkgray")+
+    annotate("segment",x=2001,xend=2001,y=680000, yend = 0,col="darkgray",arrow=arrow(),linetype="dashed")+
+    annotate("text",x=1995,y=600000,label="1997 Asian Financial Crash",col="darkgray")+
+    annotate("segment",x=1997,xend=1997,y=580000, yend = 0,col="darkgray",arrow=arrow(),linetype="dashed")
+
+ggplotly(p.hist,tooltip="text")%>%
+  layout(title = list(text = paste0("<br>",
+                                    'Total International Student Enrollment in U.S. Higher Education',
+                                    '<br>'),font=list(size=24,family = "Arial", color="black")),
+         annotations = 
+           list(x = 1, y = -0.1, text = paste0("<br>","Data Source:www.opendoorsdata.org","<br>"), 
+                showarrow = F, xref='paper', yref='paper', 
+                xanchor='right', yanchor='auto', xshift=0, yshift=0,
+                font=list(size=12,family = "Arial", color="black")))
+
+```
+
+
+## Pre-COVID {.tabset}
+
+### Top 10 Nationalities{.tabset}
+
+The following graph shows the enrollment trend of the top 10 countries of origin for international students in the U.S. as of 2019. The decline of enrollment from Saudi Arabia, South Korea,Mexico, and Japan probably contributed to the total enrollment decrease after 2016 despite of enrollment growth from other countries.
+```{r}
+#changes by nationality
+nation <- read_excel("nation.xlsx")[,-1]
+
+names(nation)<-c('Nationality',as.character(seq(2011,2020,1)))
+nation$`2020`<-as.numeric(nation$`2020`)
+nation$`2019`<-as.numeric(nation$`2019`)
+nation$`2018`<-as.numeric(nation$`2018`)
+nation$`2017`<-as.numeric(nation$`2017`)
+nation$`2016`<-as.numeric(nation$`2016`)
+nation$`2015`<-as.numeric(nation$`2015`)
+nation$`2014`<-as.numeric(nation$`2014`)
+nation$`2013`<-as.numeric(nation$`2013`)
+nation$`2012`<-as.numeric(nation$`2012`)
+nation$`2011`<-as.numeric(nation$`2011`)
+
+
+
+top10<-nation%>%
+  arrange(desc(`2019`))
+top10<-top10[c(1:10),]%>%
+  pivot_longer(!Nationality,names_to = 'year',values_to = 'n')
+change<-nation%>%
+  mutate(c2020=`2020`-`2019`,
+          c2019=`2019`-`2018`,
+          c2018=`2018`-`2017`,
+          c2017=`2017`-`2016`,
+          c2016=`2016`-`2015`,
+          c2015=`2015`-`2014`,
+          c2014=`2014`-`2013`,
+          c2013=`2013`-`2012`,
+          c2012=`2012`-`2011`)%>%
+  select('Nationality','c2012','c2013','c2014','c2015','c2016','c2017','c2018','c2019','c2020')
+names(change)<-c('Nationality',2012,2013,2014,2015,2016,2017,2018,2019,2020)
+top10change<-change%>%
+  pivot_longer(!Nationality,names_to = 'year',values_to = 'c')%>%
+  right_join(top10,by=c('Nationality','year'))
+top10change$Nationality <- factor(top10change$Nationality,levels=unique(top10$Nationality))
+top10change%>%
+  mutate(pos=c>=0)%>%
+  filter(year>2011,year<2020)%>%
+  ggplot(aes(year,n,fill=pos))+
+  geom_col() +
+  facet_wrap(Nationality~.,ncol=5)+
+  theme(plot.title = element_text(hjust = 0.5,size=18),
+        legend.position = 'top',
+        legend.title = element_blank(),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major.y = element_line(size=.1, color="gray"),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        plot.caption=element_text(family='Arial'))+
+  scale_fill_manual(labels=c('Decreased Enrollment Compared to Previous Year','Increased Enrollment Compared to Previous Year'),
+                     values=c("#EF6548","#41AB5D"))+
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3),
+                     expand=c(0,0))+
+  scale_x_discrete(breaks=seq(2012,2020,2))+
+  labs(title="Enrollment Trend of Top Nationalities Year 2012-2019",
+       caption='Data Source:www.opendoorsdata.org')
+```
+
+### Degree Level {.tabset}
+
+While the total international enrollment decline started in 2017, the new international student enrollment actually started decreasing in 2015 for graduate and undergraduate degree programs and in 2014 for non-degree programs. The new enrollment decrease rate slowed down for undergraduate and non-degree programs and graduate program enrollment went up slightly after 2017 until COVID-19 made it's impact in 2020.
+
+```{r new by level}
+#new intl enrollment by level:
+new <- read_excel("new.xlsx", range = "A4:N9")[c(1,2,3,5),]
+names(new)<-c('type',seq(2008,2020,1))
+new<-new%>%
+  pivot_longer(!type,names_to='year',values_to='new')
+
+new$year<-as.numeric(new$year)
+
+new%>%
+  filter(type!="Total")%>%
+  mutate(label = if_else(year == 2018,as.character(type),NA_character_))%>%
+  ggplot(aes(year,new,label=label,color=type, group=type,text=paste("Degree Level:",type,
+                                                         "<br>Year:",year,
+                                                         "<br>New Enrollment:",new)))+
+  geom_line()+
+  scale_color_manual(values=c("#41AB5D","steelblue","#EF6548"))+
+  theme(panel.border = element_blank(),
+        plot.title = element_text(hjust = 0.5,size=18),
+        panel.background = element_rect(fill = "white"),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        panel.grid.major.y = element_line(size=.1, color="gray"),
+        axis.ticks.y=element_blank(),
+        legend.position = '',
+        legend.title = element_blank(),
+        plot.caption=element_text(family='Arial'))+
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3),
+                     expand=c(0,0),
+                     limits=c(0,145000),
+                     breaks=seq(0,125000,25000))+
+  scale_x_continuous(breaks=seq(2008,2020,1))+
+  geom_text(nudge_y =-4000)+
+  labs(title='New International Student Enrollment by Degree Level',
+       caption='Data Source:www.opendoorsdata.org')
+```
+
+
+### Field of Study {.tabset}
+
+```{r}
+
+major <- read_excel("major.xlsx")[,-2]
+
+names(major)<-c('field',seq(1998,2020,1))
+
+
+change1719<-major%>%mutate(pos=(`2019`-`2016`)>0)%>%
+  select(field,pos)
+tb<-major%>%
+  select("field",`2014`,`2015`,`2016`,`2017`,`2018`,`2019`)
+major<-major%>%
+  pivot_longer(!field,names_to = 'year',values_to = 'n')
+major$year<-as.numeric(major$year)
+
+
+plot.df<-major%>%
+  filter(field!='Undeclared',field!='Other Fields of Study',year>=2014,year<2020,n>20000)%>%
+  left_join(change1719,by='field')%>%
+  mutate(label = if_else(year == 2019,as.character(field),NA_character_))
+tb<-tb%>%
+  anti_join(plot.df,by='field')
+
+  
+
+ggplot(data=plot.df,aes(year,n,color=pos,group=field,label=label))+
+  geom_rect(ymin=-Inf,ymax=Inf,xmin=2015.9,xmax=2019.1,fill="lightgray",color=NA,alpha=.05)+
+  geom_point(size=3)+
+  geom_line(size=1)+
+  geom_label_repel(hjust='left',nudge_x=0.2,direction = "y",show.legend = FALSE,min.segment.length = Inf)+
+  scale_x_continuous(limits=c(2014,2021),
+                     breaks=seq(2014,2019,1))+
+  scale_y_continuous(labels = label_number(suffix = " K", scale = 1e-3),
+                     limits=c(0,250000),
+                     expand=c(0,0))+
+  scale_color_manual(labels=c('decreased from 2016 to 2019','increased from 2016 to 2019'),
+                     values=c("#EF6548","#41AB5D"))+
+  theme(plot.title = element_text(hjust = 0.5,size=18),
+        panel.background = element_rect(fill = "white"),
+        axis.title.y=element_blank(),
+        axis.title.x=element_blank(),
+        panel.grid.major.y = element_line(size=.1, color="gray"),
+        axis.ticks.y=element_blank(),
+        legend.position = 'top',
+        legend.title = element_blank(),
+        plot.caption=element_text(family='Arial'))+
+  labs(title="Recent International Student Enrollment Trend by Field of Study",
+       subtitle = "Only fields of study with at least 20,000 students are in the graph.
+Other Fields are listed in the table below the graph.",
+       caption='Data Source:www.opendoorsdata.org')
+tb%>%
+  gt()%>%
+  tab_style(style = cell_text(color = "#EF6548"),
+            locations = cells_body(c(field),rows=`2019`<`2016`))%>%
+  tab_style(style = cell_text(color = "#41AB5D"),
+            locations = cells_body(c(field),rows=`2019`>`2016`))%>%
+  cols_label(field="Field of Study")%>%
+  tab_style(style=cell_text(weight = "bold"),
+            locations=cells_column_labels(everything())) %>%
+  tab_style(style=cell_fill(color="lightgray"),
+            locations=cells_column_labels(everything()))%>%
+  tab_header(title=html("<span style='color:black'><h4>Other Fields of Study</span"))
+```
+
+
+## Student Visa Applications
+
+Not only has there been a reduced number of U.S. student visa applicants after 2015, the student visa approval rate has been lower (72%-75%) between 2016 and 2019 compared to before 2015(82%-85%).The U.S. consular offices seem to have resumed normal visa processing capacity in 2021 given the number of student visa issued.
+```{r visa}
+#visa approval and refusals
+visa.app<-data.frame(year=c(seq(2014,2021,1)),
+                     issued=c(595569, 644233,471728,393573,362929,364204,111387,357839),
+                     refused=c(104922,141833,182165,146301,127337,123871,50490,NA))
+
+visa.app<-visa.app%>%
+  pivot_longer(!year, names_to='outcome', values_to='count')
+total<-visa.app%>%
+  group_by(year)%>%
+  summarize(total=sum(count))
+visa.app<-total%>%
+  right_join(visa.app,by='year')%>%
+  mutate(pct=percent(count/total,1))
+
+total$total[is.na(total$total)]<-357839
+
+ggplot()+
+  geom_bar(data=visa.app,aes(year,count,fill=factor(outcome, levels=c("refused","issued" ))),
+           stat="identity")+
+  geom_text(data=visa.app,aes(year,count,label=pct),position = position_stack(vjust = 0.5),col='white')+
+  geom_text(data=total,aes(year,total,label=total),vjust=-0.3)+
+  scale_fill_manual(values=c("#EF6548","#41AB5D"))+
+  theme(plot.title = element_text(hjust = 0.5,size=18),
+        legend.position='top',
+        legend.title = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        axis.text.y=element_blank(),
+        axis.text.x=element_text(vjust=10),
+        axis.title.y = element_blank(),
+        axis.ticks.y=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.title.x=element_blank(),
+        plot.caption=element_text(family='Arial'))+
+  scale_x_continuous(breaks=c(seq(2014,2021,1)),labels=as.character(c(seq(2014,2021,1))))+
+  labs(title='Number of U.S. Student Visa Applications Fiscal Year 2014-2021',
+       subtitle='*Refusal number is unavailable for 2021',
+       caption='Data Source:U.S.Department of State,Bureau of Consular Affairs')
+```
+
+
+## Post-COVID{.tabset}
+### Countries of Origin with Declining Enrollment{.tabset}
+
+According to the Student and Exchange Visitor Program(SEVP), the number of student visa holders in the U.S. dropped to 964401 in October 2021, compared to 1146012 in January 2020 before the COVID-19 pandemic.Different from the open door report data used in previous graphs, the SEVP data include students current enrolled in U.S. schools as well as graduates who are working under a student visa benefit.
+```{r post-covid}
+url <- read_html("https://studyinthestates.dhs.gov/sevis-data-mapping-tool/october-2021-sevis-data-mapping-tool-data")
+x <- html_table(url)[[1]]
+names(x)<-as.character(x[1,])
+oct2021<-x[-1,]%>%
+  mutate(year=2021)
+
+url <- read_html("https://studyinthestates.dhs.gov/sevis-data-mapping-tool/january-2020-sevis-data-mapping-tool-data")
+jan2020 <- html_table(url)[[1]]%>%
+  mutate(year=2019)
+
+
+names(oct2021)[1]<-'Nationality'
+names(jan2020)<-names(oct2021)
+
+
+oct2021$active_students<-as.numeric(oct2021$active_students)
+oct2021<-oct2021%>%
+  mutate(x=active_students)
+jan2020<-jan2020%>%mutate(y=active_students)
+
+gr<-left_join(oct2021,jan2020,by='Nationality')%>%
+  filter(x>y)%>%
+  mutate(change=x-y)%>%
+  select('Nationality','change')
+
+de<-left_join(oct2021,jan2020,by='Nationality')%>%
+  filter(x<y)%>%
+  mutate(change=y-x)%>%
+  select('Nationality','change') 
+
+
+
+world <- read.csv("https://raw.githubusercontent.com/plotly/datasets/master/2014_world_gdp_with_codes.csv")%>%
+  mutate(Nationality=toupper(COUNTRY))
+
+world$Nationality<-sub("CONGO, REPUBLIC OF THE","CONGO (BRAZZAVILLE)",world$Nationality)
+world$Nationality<-sub("CONGO, DEMOCRATIC REPUBLIC OF THE","CONGO (KINSHASA)",world$Nationality)
+world$Nationality<-sub("KOREA, SOUTH","SOUTH KOREA",world$Nationality)
+
+world.de<-world%>%
+  left_join(de,by='Nationality')%>%
+  filter(change<60000)
+world.de$hover <- with(world.de, paste(COUNTRY,":decreased",change))
+plot_ly(world.de, type='choropleth', locations=world.de$CODE, z=world.de$change, text=world.de$hover,hoverinfo = "text", colors="OrRd")%>%
+  layout(title = list(text = paste0("<br>",
+                                    ' Countries of Origin with Decreased Enrollment from 2019 to 2021',
+                                    "<br>",
+                                    '<sup>',
+                                    'Student Visa Holders from China decreased by 111036 from 2019 to 2021',
+                                    '<br>',
+                                    'and is omitted in the map to allow trends to show for other countries.',
+                                    '</sup>','<br>'),font=list(size=24,family = "Arial", color="black")),
+         annotations = 
+           list(x = 1, y = 0.1, text = paste0("Data Source:www.studyinthestates.dhs,gov"),font=list(size=12,family = "Arial", color="black"),showarrow = F))
+```
+
+### Countries of Origin with Increasing Enrollment{.tabset}
+```{r}
+world.gr<-world%>%
+  left_join(gr,by='Nationality')
+world.gr$hover <- with(world.gr, paste(COUNTRY,":increased",change))
+plot_ly(world.gr, type='choropleth', locations=world.gr$CODE, z=world.gr$change, text=world.gr$hover, colors="YlGn",hoverinfo = "text")%>%
+  layout(title = list(text = paste0("<br>",
+                                    'Countries of Origin with Increased Enrollment from 2019 to 2021',
+                                    "<br>"),font=list(size=24,family = "Arial", color="black")),
+         annotations = 
+           list(x = 1, y = 0.1,text = paste0("Data Source:www.studyinthestates.dhs,gov"),font=list(size=12,family = "Arial", color="black"), showarrow = F))
+```
+
+
+## Concluding Thoughts
+
+The decline of international student enrollment in the U.S. after 2016, exacerbated by the COVID-19 pandemic, is alarming for U.S. higher education institutions and international education professionals in the U.S. It presents an urgent call for strategic planning to prepare and move forward into the reshaped world of international enrollment.
